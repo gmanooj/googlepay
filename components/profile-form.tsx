@@ -1,3 +1,4 @@
+import { getApiBaseUrl } from '@/constants/config';
 import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
@@ -44,14 +45,7 @@ export default function ProfileForm({ onSaveSuccess }: ProfileFormProps) {
     loadPhone();
   }, []);
 
-  const getApiBaseUrl = () => {
-    const hostUri = Constants.expoConfig?.hostUri;
-    if (hostUri) {
-      const ip = hostUri.split(':')[0];
-      return `http://${ip}:5000`;
-    }
-    return 'http://localhost:5000';
-  };
+
 
   const handleSaveProfile = async () => {
     if (!name.trim()) {

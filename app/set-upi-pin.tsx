@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   StyleSheet,
   View,
@@ -12,13 +12,12 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { getApiBaseUrl } from '@/constants/config';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import Svg, { Path } from 'react-native-svg';
 
-const hostUri = Constants.expoConfig?.hostUri;
-const localIp = hostUri ? hostUri.split(':')[0] : 'localhost';
-const API_HOST = `http://${localIp}:5000`;
+const API_HOST = getApiBaseUrl();
 
 function UpiLogo() {
   return (

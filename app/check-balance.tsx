@@ -1,3 +1,4 @@
+import { getApiBaseUrl } from '@/constants/config';
 import React, { useState, useRef, useEffect } from 'react';
 import {
   StyleSheet,
@@ -17,9 +18,7 @@ import Constants from 'expo-constants';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-const hostUri = Constants.expoConfig?.hostUri;
-const localIp = hostUri ? hostUri.split(':')[0] : 'localhost';
-const API_HOST = `http://${localIp}:5000`;
+const API_HOST = getApiBaseUrl();
 
 // UPI Logo SVG component
 function UpiLogo() {

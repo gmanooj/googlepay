@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import { getApiBaseUrl } from '@/constants/config';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   StyleSheet,
   View,
@@ -77,9 +78,7 @@ export default function MyQrScreen() {
         }
 
         // Fetch live user profile and QR code image from MongoDB database
-        const hostUri = Constants.expoConfig?.hostUri;
-        const localIp = hostUri ? hostUri.split(':')[0] : 'localhost';
-        const apiHost = `http://${localIp}:5000`;
+        const apiHost = getApiBaseUrl();
         const response = await fetch(`${apiHost}/api/get-user-profile?phone=${storedPhone}`);
         const data = await response.json();
         if (data.success && data.user) {
@@ -154,9 +153,7 @@ export default function MyQrScreen() {
 
         // 2. Upload to MongoDB Backend API
         const storedPhone = await AsyncStorage.getItem('user_phone') || '6380866053';
-        const hostUri = Constants.expoConfig?.hostUri;
-        const localIp = hostUri ? hostUri.split(':')[0] : 'localhost';
-        const apiHost = `http://${localIp}:5000`;
+        const apiHost = getApiBaseUrl();
 
         const uploadRes = await fetch(`${apiHost}/api/upload-qr`, {
           method: 'POST',

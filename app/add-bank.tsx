@@ -1,3 +1,4 @@
+import { getApiBaseUrl } from '@/constants/config';
 import React, { useState, useEffect, useRef } from 'react';
 import {
   StyleSheet,
@@ -90,10 +91,7 @@ export default function AddBankAccountScreen() {
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const progressAnim = useRef(new Animated.Value(0)).current;
 
-  // Resolve backend server local IP
-  const hostUri = Constants.expoConfig?.hostUri;
-  const localIp = hostUri ? hostUri.split(':')[0] : 'localhost';
-  const API_HOST = `http://${localIp}:5000`;
+  const API_HOST = getApiBaseUrl();
 
   useEffect(() => {
     async function loadUserInfo() {

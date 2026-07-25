@@ -1,3 +1,4 @@
+import { getApiBaseUrl } from '@/constants/config';
 import React, { useState, useEffect } from 'react';
 import {
   StyleSheet,
@@ -40,9 +41,7 @@ export default function AutopayScreen() {
   useEffect(() => {
     async function fetchAutopays() {
       try {
-        const hostUri = Constants.expoConfig?.hostUri;
-        const localIp = hostUri ? hostUri.split(':')[0] : 'localhost';
-        const apiHost = `http://${localIp}:5000`;
+        const apiHost = getApiBaseUrl();
         const res = await fetch(`${apiHost}/api/get-autopays`);
         const data = await res.json();
         if (data.success && Array.isArray(data.autopays)) {

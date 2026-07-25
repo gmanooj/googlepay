@@ -1,3 +1,4 @@
+import { getApiBaseUrl } from '@/constants/config';
 import React, { useState, useEffect, useRef } from 'react';
 import {
   StyleSheet,
@@ -18,9 +19,7 @@ import Svg, { Path } from 'react-native-svg';
 import LottieView from 'lottie-react-native';
 import { useAudioPlayer } from 'expo-audio';
 
-const hostUri = Constants.expoConfig?.hostUri;
-const localIp = hostUri ? hostUri.split(':')[0] : 'localhost';
-const API_HOST = `http://${localIp}:5000`;
+const API_HOST = getApiBaseUrl();
 
 function UpiLogo() {
   return (

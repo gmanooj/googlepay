@@ -1,3 +1,4 @@
+import { getApiBaseUrl } from '@/constants/config';
 import React, { useState, useCallback, useRef } from 'react';
 import {
   StyleSheet,
@@ -110,9 +111,7 @@ export default function MoneyScreen() {
             setBankAccounts(JSON.parse(storedBanks));
           }
           if (phone) {
-            const hostUri = Constants.expoConfig?.hostUri;
-            const localIp = hostUri ? hostUri.split(':')[0] : 'localhost';
-            const apiHost = `http://${localIp}:5000`;
+            const apiHost = getApiBaseUrl();
             const res = await fetch(`${apiHost}/api/get-bank-accounts?phone=${phone}`);
             const data = await res.json();
             if (data.success && data.bankAccounts) {

@@ -1,3 +1,4 @@
+import { getApiBaseUrl } from '@/constants/config';
 import React, { useState, useRef, useEffect } from 'react';
 import {
   StyleSheet,
@@ -46,16 +47,6 @@ export default function AuthFlow({ onAuthSuccess }: AuthFlowProps) {
   // OTP State: 6-digit code
   const [otp, setOtp] = useState(['', '', '', '', '', '']);
   const otpInputs = useRef<Array<TextInput | null>>([]);
-
-  const getApiBaseUrl = () => {
-    // Dynamically retrieve local dev server IP
-    const hostUri = Constants.expoConfig?.hostUri;
-    if (hostUri) {
-      const ip = hostUri.split(':')[0];
-      return `http://${ip}:5000`;
-    }
-    return 'http://localhost:5000';
-  };
 
   const fullPhoneNumber = `${selectedCountry.code}${phoneNumber}`;
 
