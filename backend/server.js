@@ -145,8 +145,36 @@ app.post('/api/send-otp', async (req, res) => {
       { upsert: true, new: true }
     );
 
+    // 1. Fast2SMS Real SMS OTP Delivery
+    const fast2smsKey = process.env.FAST2SMS_API_KEY || 'IA2BuDewLCMZak5oTPb4FHymds0KhqE96zpiG1OcSv83NYgx7RLyrnvB9pEG4weYWXSAxNhJbHdUocMu';
+    const cleanNumber = phone.replace(/[^0-9]/g, '').slice(-10);
+
+    if (fast2smsKey && cleanNumber.length === 10) {
+      try {
+        const f2sResponse = await fetch('https://www.fast2sms.com/dev/bulkV2', {
+          method: 'POST',
+          headers: {
+            'authorization': fast2smsKey,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({
+            variables_values: otp,
+            route: 'otp',
+            numbers: cleanNumber
+          })
+        });
+        const f2sData = await f2sResponse.json();
+        console.log(`[Fast2SMS] Sent real SMS OTP ${otp} to ${cleanNumber}. Result:`, f2sData);
+        if (f2sData.return || f2sData.status_code === 200) {
+          return res.json({ success: true, mode: 'sms', message: 'OTP sent via SMS.' });
+        }
+      } catch (f2sErr) {
+        console.error('[Fast2SMS Error]:', f2sErr?.message || f2sErr);
+      }
+    }
+
     if (twilioClient) {
-      // Send real SMS
+      // Send real SMS via Twilio
       await twilioClient.messages.create({
         body: `Your Google Pay verification code is: ${otp}. Do not share this code.`,
         from: TWILIO_PHONE_NUMBER,
@@ -155,7 +183,7 @@ app.post('/api/send-otp', async (req, res) => {
       console.log(`Sent real SMS OTP ${otp} to ${phone}`);
       return res.json({ success: true, mode: 'sms', message: 'OTP sent via SMS.' });
     } else {
-      // Mock mode
+      // Mock mode fallback
       console.log('========================================================');
       console.log(`[MOCK OTP] Phone: ${phone} | OTP Code: ${otp}`);
       console.log('========================================================');
