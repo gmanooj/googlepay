@@ -66,7 +66,13 @@ export default function AuthFlow({ onAuthSuccess }: AuthFlowProps) {
         body: JSON.stringify({ phone: fullPhoneNumber }),
       });
 
-      const data = await response.json();
+      const textResponse = await response.text();
+      let data: any = {};
+      try {
+        data = JSON.parse(textResponse);
+      } catch (err) {
+        throw new Error(`Server returned status ${response.status} (Not Found or Starting up). Please verify your Render URL in constants/config.ts.`);
+      }
       setLoading(false);
 
       if (data.success) {
@@ -86,7 +92,7 @@ export default function AuthFlow({ onAuthSuccess }: AuthFlowProps) {
       console.error('Send OTP Error:', error);
       Alert.alert(
         'Connection Error',
-        `Failed to reach the backend server.\n\nMake sure the Node server is running at:\n${getApiBaseUrl()}\n\nDetail: ${error.message}`
+        `Failed to reach the backend server.\n\nServer URL:\n${getApiBaseUrl()}\n\nDetail: ${error.message}`
       );
     }
   };
@@ -108,7 +114,13 @@ export default function AuthFlow({ onAuthSuccess }: AuthFlowProps) {
         body: JSON.stringify({ phone: fullPhoneNumber, otp: otpCode }),
       });
 
-      const data = await response.json();
+      const textResponse = await response.text();
+      let data: any = {};
+      try {
+        data = JSON.parse(textResponse);
+      } catch (err) {
+        throw new Error(`Server returned status ${response.status}. Please check your Render URL.`);
+      }
       setLoading(false);
 
       if (data.success) {
