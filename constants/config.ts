@@ -4,7 +4,7 @@ import Constants from 'expo-constants';
  * PRODUCTION BACKEND SERVER URL
  * Replace this string with your live deployed Render URL (e.g., 'https://your-app-name.onrender.com')
  */
-export const LIVE_BACKEND_URL = 'https://googlepay-backend.onrender.com';
+export const LIVE_BACKEND_URL = 'https://googlepay-2dsh.onrender.com';
 
 /**
  * Dynamically gets the API base URL:
