@@ -30,6 +30,10 @@ export default function RootLayout() {
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [showPrivacyOverlay, setShowPrivacyOverlay] = useState(false);
 
+  // Track background time for 1-minute timeout requirement
+  const lastBackgroundTimeRef = useRef<number | null>(null);
+  const isAuthenticatingRef = useRef(false);
+
   // Check user session on startup
   useEffect(() => {
     async function checkSession() {
@@ -51,12 +55,10 @@ export default function RootLayout() {
     checkSession();
   }, []);
 
-  const isAuthenticatingRef = useRef(false);
-
   // Biometric Authentication Function
   const authenticateUser = async () => {
     if (isAuthenticatingRef.current) {
-      console.log('Biometric authentication already in progress. Ignoring duplicate request.');
+      console.log('Biometric authentication already in progress.');
       return false;
     }
     isAuthenticatingRef.current = true;
@@ -81,7 +83,7 @@ export default function RootLayout() {
           return false;
         }
       } else {
-        // Device doesn't have/support biometrics; bypass or assume unlocked
+        // If biometrics hardware or enrollment is unavailable on test device, bypass lock
         setIsUnlocked(true);
         setShowPrivacyOverlay(false);
         isAuthenticatingRef.current = false;
@@ -90,42 +92,57 @@ export default function RootLayout() {
     } catch (error) {
       console.error('Biometric authentication failed:', error);
       setIsUnlocked(true);
+      setShowPrivacyOverlay(false);
       isAuthenticatingRef.current = false;
       return true;
     }
   };
 
-  // Trigger authentication on app startup (once splash is gone and user is authenticated)
+  // Trigger authentication on app startup (1st time after splash screen)
   useEffect(() => {
     if (!isSplashVisible && !isAuthLoading && isAuthenticated && isProfileComplete && !isUnlocked && !isAuthenticatingRef.current) {
       authenticateUser();
     }
   }, [isSplashVisible, isAuthLoading, isAuthenticated, isProfileComplete, isUnlocked]);
 
-  // AppState change listener for switcher privacy overlay and background locking
+  // AppState change listener:
+  // 1. Instantly shows "App content hidden" (Image 3 UI) when switching apps / recents view
+  // 2. Records background timestamp. If user returns within 1 min (<60s), resumes without fingerprint.
+  //    If user returns after 1 min (>=60s), prompts fingerprint again!
   useEffect(() => {
     const handleAppStateChange = async (nextAppState: AppStateStatus) => {
-      if (nextAppState === 'background') {
-        // Hide content immediately when app goes to background (user pressed home button)
+      if (nextAppState === 'background' || nextAppState === 'inactive') {
+        // App moving out of active foreground view -> Show privacy overlay immediately for Task Switcher!
+        setShowPrivacyOverlay(true);
+        if (!lastBackgroundTimeRef.current) {
+          lastBackgroundTimeRef.current = Date.now();
+        }
         try {
           await LocalAuthentication.cancelAuthenticate();
         } catch (err) {
-          console.log('Error canceling biometrics:', err);
+          // ignore error on cancel
         }
-        setIsUnlocked(false);
-        setShowPrivacyOverlay(true);
-        isAuthenticatingRef.current = false; // Reset lock to prevent native OS hangs!
-      } else if (nextAppState === 'inactive') {
-        // App goes to App Switcher mode or system prompt overlays app.
-        // Secure screen immediately. But do NOT reset isUnlocked to false if we are currently
-        // authenticating to prevent feedback loops with system prompts!
-        setShowPrivacyOverlay(true);
-        if (!isAuthenticatingRef.current) {
-          setIsUnlocked(false);
-        }
+        isAuthenticatingRef.current = false;
       } else if (nextAppState === 'active') {
-        // App returned to active state. We do NOT auto-trigger to avoid native lifecycle hangs.
-        // The user will tap the "Unlock GPay" button which is now 100% reliable.
+        // User brought app back to foreground
+        if (lastBackgroundTimeRef.current) {
+          const elapsedSeconds = (Date.now() - lastBackgroundTimeRef.current) / 1000;
+          lastBackgroundTimeRef.current = null;
+
+          if (elapsedSeconds >= 60) {
+            // Away for 1 minute or more -> Require fingerprint authentication again!
+            setIsUnlocked(false);
+            setShowPrivacyOverlay(false);
+            setTimeout(() => {
+              authenticateUser();
+            }, 300);
+          } else {
+            // Away for less than 1 minute -> Resume directly without fingerprint prompt!
+            setShowPrivacyOverlay(false);
+          }
+        } else {
+          setShowPrivacyOverlay(false);
+        }
       }
     };
 
@@ -133,12 +150,10 @@ export default function RootLayout() {
     return () => {
       subscription.remove();
     };
-  }, [isAuthenticated, isProfileComplete, isUnlocked]);
+  }, [isAuthenticated, isProfileComplete]);
 
-  const shouldShowLockScreen = !isSplashVisible && isAuthenticated && isProfileComplete && (!isUnlocked || showPrivacyOverlay);
-
-  const themeBgColor = isDark ? '#121212' : '#ffffff';
-  const themeTextColor = isDark ? '#ffffff' : '#202124';
+  const shouldShowPrivacyOverlay = showPrivacyOverlay;
+  const shouldShowLockScreen = !isSplashVisible && isAuthenticated && isProfileComplete && !isUnlocked && !showPrivacyOverlay;
 
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
@@ -170,7 +185,7 @@ export default function RootLayout() {
         <LandingSplashScreen onAnimationComplete={() => setIsSplashVisible(false)} />
       )}
 
-      {/* 2. Login Flow (asks for country code, phone number, and SMS OTP verification) */}
+      {/* 2. Login Flow (SMS OTP) */}
       {!isSplashVisible && !isAuthLoading && !isAuthenticated && (
         <AuthFlow onAuthSuccess={() => {
           setIsAuthenticated(true);
@@ -178,7 +193,7 @@ export default function RootLayout() {
         }} />
       )}
 
-      {/* 3. Profile Registration Form (asks for Name, Age, DoB) */}
+      {/* 3. Profile Registration Form */}
       {!isSplashVisible && !isAuthLoading && isAuthenticated && !isProfileComplete && (
         <ProfileForm onSaveSuccess={() => {
           setIsProfileComplete(true);
@@ -186,12 +201,22 @@ export default function RootLayout() {
         }} />
       )}
 
-      {/* 4. Fingerprint Security Lock / Privacy Screen Overlay */}
+      {/* 4. App Content Hidden (Privacy Overlay shown in Task Switcher / App Switcher) - Matching Image 3 */}
+      {shouldShowPrivacyOverlay && (
+        <View style={[styles.privacyContainer, { backgroundColor: isDark ? '#1f1f1f' : '#ffffff' }]}>
+          <View style={styles.privacyCard}>
+            <Ionicons name="eye-off-outline" size={60} color={isDark ? '#8ab4f8' : '#70757a'} style={{ marginBottom: 16 }} />
+            <Text style={[styles.privacyText, { color: isDark ? '#e8eaed' : '#5f6368' }]}>App content hidden</Text>
+          </View>
+        </View>
+      )}
+
+      {/* 5. Fingerprint Security Lock Screen (When locked after 1-min background timeout or 1st launch) */}
       {shouldShowLockScreen && (
         <View style={[styles.lockScreenContainer, { backgroundColor: isDark ? '#121212' : '#ffffff' }]}>
           <View style={styles.lockContent}>
             <View style={[styles.brandIconContainer, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : '#e8f0fe' }]}>
-              <Ionicons name="lock-closed" size={48} color={isDark ? '#ffffff' : '#1a73e8'} />
+              <Ionicons name="lock-closed" size={44} color={isDark ? '#8ab4f8' : '#1a73e8'} />
             </View>
             <Text style={[styles.lockTitle, { color: isDark ? '#ffffff' : '#202124' }]}>Google Pay</Text>
             <Text style={[styles.lockSubtitle, { color: isDark ? '#9aa0a6' : '#5f6368' }]}>
@@ -201,13 +226,12 @@ export default function RootLayout() {
             <TouchableOpacity 
               style={styles.unlockButton} 
               onPress={async () => {
-                // Force reset lock on manual tap to resolve native concurrency hangs
                 isAuthenticatingRef.current = false;
                 await authenticateUser();
               }}
             >
-              <Ionicons name="finger-print" size={20} color={isDark ? '#ffffff' : '#000000'} style={styles.unlockIcon} />
-              <Text style={[styles.unlockButtonText, { color: isDark ? '#ffffff' : '#000000' }]}>Unlock GPay</Text>
+              <Ionicons name="finger-print" size={22} color={isDark ? '#8ab4f8' : '#1a73e8'} style={styles.unlockIcon} />
+              <Text style={[styles.unlockButtonText, { color: isDark ? '#8ab4f8' : '#1a73e8' }]}>Unlock GPay</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -217,11 +241,27 @@ export default function RootLayout() {
 }
 
 const styles = StyleSheet.create({
+  privacyContainer: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 999999,
+  },
+  privacyCard: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 32,
+  },
+  privacyText: {
+    fontSize: 18,
+    fontWeight: '500',
+    textAlign: 'center',
+  },
   lockScreenContainer: {
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 99999, // Overlay everything
+    zIndex: 99999,
   },
   lockContent: {
     justifyContent: 'center',
@@ -229,9 +269,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 40,
   },
   brandIconContainer: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
+    width: 90,
+    height: 90,
+    borderRadius: 45,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 20,
@@ -243,14 +283,14 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   lockSubtitle: {
-    fontSize: 14,
+    fontSize: 15,
     textAlign: 'center',
     lineHeight: 20,
   },
   unlockButton: {
     backgroundColor: 'transparent',
-    borderWidth: 1,
-    borderColor: '#dadce0',
+    borderWidth: 1.5,
+    borderColor: '#1a73e8',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -264,6 +304,6 @@ const styles = StyleSheet.create({
   },
   unlockButtonText: {
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '600',
   },
 });
